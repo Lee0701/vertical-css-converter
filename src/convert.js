@@ -25,6 +25,19 @@ const replacements = {
     'max-height': 'max-block-size',
 }
 
+export async function convertRecursive(inpath) {
+    if((await fs.stat(inpath)).isDirectory()) {
+        const files = await fs.readdir(inpath)
+        await Promise.all(files.map((file) => {
+            return convertRecursive(path.join(inpath, file))
+        }))
+    } else if(['.css', '.less', '.scss', '.sass'].includes(path.extname(inpath))) {
+        const content = await fs.readFile(inpath, 'utf-8')
+        const result = await convert(content)
+        await fs.writeFile(inpath, result)
+    }
+}
+
 export async function convertAll(indir, outdir) {
     const files = await fs.readdir(indir)
     await Promise.all(files.map((file) => {
