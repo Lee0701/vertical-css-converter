@@ -55,7 +55,7 @@ export async function convertFile(input, output) {
 
 export default function convert(str) {
     const lines = str.split('\n')
-    const output = lines.map(convertLine)
+    const output = lines.flatMap(convertLine)
     return output.join('\n')
 }
 
@@ -67,11 +67,11 @@ export function convertLine(line) {
     else if(content.includes('{') || content.includes('}')) return line
     else if(content.endsWith(',')) return line
     else if(content.startsWith('@')) return line
-    else if(content.includes('/*') || content.includes('*/')) return line
+    else if(content.includes('/*') || content.includes('*/') || content.startsWith('*')) return line
     const [key, value] = content.split(':')
-    const resultKey = convertKey(key)
-    const resultValue = convertValue(value.replace(';', ''))
-    return `${indent}${resultKey}: ${resultValue};${comment ? ' // ' + comment : ''}`
+    const entries = convertPair(key, value)
+    const result = entries.map(([k, v]) => [convertKey(k), convertValue(v.replace(';', ''))])
+    return result.map(([k, v]) => `${indent}${k}: ${v};${comment ? ' // ' + comment : ''}`)
 }
 
 export function convertKey(key) {
@@ -81,9 +81,11 @@ export function convertKey(key) {
         return `inset-${dir}`
     } else if(key.startsWith('margin-')) {
         const dir = directions[key.replace('margin-', '')]
+        if(!dir) return key
         return `margin-${dir}`
     } else if(key.startsWith('padding-')) {
         const dir = directions[key.replace('padding-', '')]
+        if(!dir) return key
         return `padding-${dir}`
     } else if(key.startsWith('border-') && key != 'border-radius') {
         if(key.endsWith('-width')) {
@@ -104,4 +106,31 @@ export function convertKey(key) {
 export function convertValue(value) {
     value = value.trim()
     return value
+}
+
+export function convertPair(key, value) {
+    key = key.trim()
+    value = value.trim()
+    const result = []
+    if(key == 'margin' || key == 'padding') {
+        const values = value.split(/\s+/)
+        const count = values.length
+        if(count == 1) {
+            result.push([key, values[0]])
+        } else if(count == 2) {
+            result.push([`${key}-block`, values[0]])
+            result.push([`${key}-inline`, values[1]])
+        } else if(count == 3) {
+            result.push([`${key}-block-start`, values[0]])
+            result.push([`${key}-inline`, values[1]])
+            result.push([`${key}-block-end`, values[2]])
+        } else if(count == 4) {
+            result.push([`${key}-block-start`, values[0]])
+            result.push([`${key}-inline-end`, values[1]])
+            result.push([`${key}-block-end`, values[2]])
+            result.push([`${key}-inline-start`, values[3]])
+        }
+    }
+    if(result.length == 0) result.push([key, value])
+    return result
 }
